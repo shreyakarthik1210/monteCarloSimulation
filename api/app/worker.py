@@ -7,6 +7,8 @@ from typing import Any, Dict
 from google.cloud import firestore
 from app.services.firestore import get_db, runs_collection
 
+from app.core.simulate import simulate_aggregate_loss
+
 
 def update_run(db: firestore.Client, run_id: str, patch: Dict[str, Any]) -> None:
     runs_collection(db).document(run_id).update(patch)
@@ -40,28 +42,21 @@ def main() -> None:
     })
 
     try:
-        # ---- Stub "simulation" for Day 2 ----
-        # Replace this with Monte Carlo Day 3.
-        time.sleep(5)
-
-        # Fake results so the pipeline is end-to-end
-        results = {
-            "gross": {
-                "mean_loss": 123456.0,
-                "VaR95": 250000.0,
-                "VaR99": 400000.0,
-                "TVaR95": 300000.0,
-                "TVaR99": 500000.0,
-                "ruinProb": 0.01 if capital > 500000 else 0.2,
-            }
-        }
-
+        results = simulate_aggregate_loss(
+        n_sims=n_sims,
+        freq_lambda=0.08,      # temporary constant (configurable later)
+        sev_mu=10.0,           # lognormal mean
+        sev_sigma=1.0,         # lognormal sigma
+        capital=capital,
+        seed=42,
+        )
         update_run(db, run_id, {
             "status": "done",
             "finished_at": datetime.now(timezone.utc).isoformat(),
             "results": results,
         })
         print(f"Run {run_id} completed.")
+
     except Exception as e:
         update_run(db, run_id, {
             "status": "failed",
