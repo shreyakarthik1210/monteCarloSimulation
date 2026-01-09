@@ -4,4 +4,8 @@ pydantic==2.8.2
 google-cloud-firestore==2.16.1
 google-auth==2.32.0
 requests==2.32.3
-numpy
+numpy==1.26.4
+scikit-learn==1.4.2
+joblib==1.4.2
+google-cloud-storage==2.17.0
+pandas==2.2.2
