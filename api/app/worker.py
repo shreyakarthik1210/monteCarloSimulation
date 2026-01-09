@@ -8,6 +8,8 @@ from google.cloud import firestore
 from app.services.firestore import get_db, runs_collection
 
 from app.core.simulate import simulate_aggregate_loss
+from app.core.simulate import simulate_gross_net
+
 
 
 def update_run(db: firestore.Client, run_id: str, patch: Dict[str, Any]) -> None:
@@ -34,6 +36,14 @@ def main() -> None:
     n_sims = int(req.get("n_sims", 50000))
     capital = float(req.get("capital", 1_000_000))
 
+    cfg = req.get("config", {}) or {}
+    freq_lambda = float(cfg.get("freq_lambda", 0.3))
+    sev_mu = float(cfg.get("sev_mu", 10.2))
+    sev_sigma = float(cfg.get("sev_sigma", 1.1))
+    seed = int(cfg.get("seed", 42))
+
+    reinsurance = cfg.get("reinsurance", {"type": "none"})
+
     # Mark running
     update_run(db, run_id, {
         "status": "running",
@@ -42,14 +52,15 @@ def main() -> None:
     })
 
     try:
-        results = simulate_aggregate_loss(
+        results = simulate_gross_net(
         n_sims=n_sims,
-        freq_lambda=0.08,      # temporary constant (configurable later)
-        sev_mu=10.0,           # lognormal mean
-        sev_sigma=1.0,         # lognormal sigma
+        freq_lambda=freq_lambda,
+        sev_mu=sev_mu,
+        sev_sigma=sev_sigma,
         capital=capital,
-        seed=42,
-        )
+        reinsurance=reinsurance,
+        seed=seed,
+    )
         update_run(db, run_id, {
             "status": "done",
             "finished_at": datetime.now(timezone.utc).isoformat(),
@@ -64,6 +75,8 @@ def main() -> None:
             "error": str(e),
         })
         raise
+
+    
 
 
 if __name__ == "__main__":

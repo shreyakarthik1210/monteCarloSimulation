@@ -4,3 +4,4 @@ pydantic==2.8.2
 google-cloud-firestore==2.16.1
 google-auth==2.32.0
 requests==2.32.3
+numpy

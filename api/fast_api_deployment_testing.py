@@ -87,6 +87,21 @@ def poll_until_done(run_id, timeout=300, interval=2):
         time.sleep(interval)
     raise TimeoutError("Timed out waiting for run to finish")
 
+def check_run_completion(run_id):
+    url = f"{API_URL}/runs/{run_id}"
+    try:
+        response = subprocess.run(["curl", url, "|", "python", "-m", "json.tool"], check=True, 
+                                  capture_output=True, text=True)
+        print("Run details:", response.stdout)
+    except Exception as e:
+        check_run_id = input("Would you like to check jobs with that run ID? (y/n): ")
+        if check_run_id.lower() == 'y':
+            try:
+                response = subprocess.run(["gcloud", "run", "jobs", "executions", "list", 
+                                           "--filter", f"metadata.labels.run_id={run_id}"], capture_output=True, text=True)
+                print("Job executions:", response.stdout)
+            except Exception as ex:
+                print("Could not get job executions:", ex)
 if __name__ == "__main__":
     if(check_deployment_status()):
         run_id = get_run_id()
@@ -94,6 +109,9 @@ if __name__ == "__main__":
         check_poll = input("Would you like to poll for completion? (y/n): ")
         if check_poll.lower() == 'y' and run_id:
             final = poll_until_done(run_id, timeout=600)
+            check_completion = input("Would you like tyo check run completion details? (y/n): ")
+            if check_completion.lower() == 'y':
+                check_run_completion(run_id)
 
 
 '''
