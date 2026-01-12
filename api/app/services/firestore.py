@@ -1,4 +1,5 @@
 import os
+import json
 from typing import Any
 from typing import Optional
 from google.cloud.firestore import Client
@@ -7,6 +8,11 @@ try:
     from google.cloud import firestore  # type: ignore
 except Exception:  # pragma: no cover - optional dependency in local dev
     firestore = None  # type: ignore
+
+try:
+    from google.oauth2 import service_account  # type: ignore
+except Exception:  # pragma: no cover - optional dependency in local dev
+    service_account = None  # type: ignore
 
 
 class _LocalDocumentSnapshot:
@@ -70,9 +76,33 @@ def get_db() -> Any:
         raise RuntimeError("google-cloud-firestore is not available in this environment")
 
     try:
+        # First, check for explicit service account credentials provided via
+        # environment (either a file path or raw JSON). This allows local
+        # development without relying on ADC being configured globally.
+        creds = None
+
+        # Path from standard var or project-specific fallback
+        sa_path = (
+            os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
+            or os.environ.get("RISK_ASSER_SERVICE_ACCOUNT_FILE")
+        )
+
+        sa_json = os.environ.get("RISK_ASSER_SERVICE_ACCOUNT_JSON")
+
+        if sa_json and service_account is not None:
+            info = json.loads(sa_json)
+            creds = service_account.Credentials.from_service_account_info(info)
+        elif sa_path and service_account is not None:
+            creds = service_account.Credentials.from_service_account_file(sa_path)
+
+        if creds is not None:
+            if project_id:
+                return firestore.Client(project=project_id, credentials=creds)
+            return firestore.Client(credentials=creds)
+
+        # Otherwise rely on ADC / environment to provide credentials/project
         if project_id:
             return firestore.Client(project=project_id)
-        # Let the client pick up project from ADC if not provided explicitly
         return firestore.Client()
     except Exception as e:
         # If init failed and local mode wasn't requested, surface a clear error.
